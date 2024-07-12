@@ -5,8 +5,8 @@
 #include "telag2.h"
 #include <time.h>
 
-#define LARGURA_TELA 1280
-#define ALTURA_TELA 720
+#define LARGURA_TELA 600
+#define ALTURA_TELA 500
 
 // Definição das áreas de clique para cada opção do menu
 typedef struct {
@@ -27,9 +27,9 @@ typedef struct {
 } pontuacao_t;
 
 typedef struct {
-    int valor; // 0 para vazio, 1-9 para números
-    bool inicial; // true se é um número inicial que não pode ser alterado
-    bool marcacoes[9]; // marcadores para os números 1-9
+    int valor;
+    bool inicial;
+    bool marca[9]; // Marcações de 1 a 9
 } casa_t;
 
 typedef struct {
@@ -46,6 +46,7 @@ typedef struct {
 pontuacao_t* ler_pontuacoes(const char* arquivo, int* num_pontuacoes);
 void escrever_pontuacoes(const char* arquivo, pontuacao_t* pontuacoes, int num_pontuacoes);
 int comparar_pontuacoes(const void* a, const void* b);
+tamanho_t tela_texto_dimensoes(int altura_fonte, const char* texto);
 
 void desenhar_cursor_mouse(rato_t rato) {
     cor_t cor_cursor = {1, 0, 0, 1};
@@ -54,92 +55,30 @@ void desenhar_cursor_mouse(rato_t rato) {
     tela_circulo(cursor, 1, cor_cursor, cor_cursor);
 }
 
-// Desenha um botão com fundo
-void desenhar_botao(botao_t botao, cor_t cor_fundo, cor_t cor_borda, cor_t cor_texto, char texto[]) {
-    retangulo_t retangulo_fundo = {botao.posicao, botao.tamanho};
-    tela_retangulo(retangulo_fundo, 2, cor_borda, cor_fundo);
+tamanho_t tela_texto_dimensoes(int altura_fonte, const char* texto) {
+    tamanho_t dimensoes;
+    dimensoes.largura = strlen(texto) * (altura_fonte / 2); // Largura média de caracteres ajustável
+    dimensoes.altura = altura_fonte; // Altura da fonte
 
-    // Calcula a posição do texto centralizado no botão
-    int altura_fonte = 24;
-    ponto_t posicao_texto = {botao.posicao.x + botao.tamanho.largura / 2, botao.posicao.y + (botao.tamanho.altura - altura_fonte) / 2};
-    tela_texto(posicao_texto, altura_fonte, cor_texto, texto);
+    return dimensoes;
 }
 
-void exibir_menu_inicial() {
-    tamanho_t tamanho_tela = {LARGURA_TELA, ALTURA_TELA};
-    tela_inicio(tamanho_tela, "Lucas Sudoku Game");
 
-    cor_t cor_fundo = {0, 0, 0, 1};
-    cor_t cor_texto = {0, 1, 0, 1};
-    cor_t cor_botao_fundo = {0.2, 0.2, 0.2, 1};
-    cor_t cor_botao_borda = {0, 1, 0, 1};
+void desenhar_botao_centralizado(botao_t botao, cor_t cor_fundo, cor_t cor_borda, cor_t cor_texto, const char* texto) {
+    // Desenha retângulo de fundo
+    tela_retangulo((retangulo_t){botao.posicao, botao.tamanho}, 2, cor_borda, cor_fundo);
 
-    ponto_t posicao_titulo = {LARGURA_TELA / 2, ALTURA_TELA / 4};
-    ponto_t posicao_iniciar = {LARGURA_TELA / 2 - 150, ALTURA_TELA / 2 - 70};
-    ponto_t posicao_recordes = {LARGURA_TELA / 2 - 150, ALTURA_TELA / 2};
-    ponto_t posicao_sair = {LARGURA_TELA / 2 - 150, ALTURA_TELA / 2 + 70};
+    // Calcula a posição do texto para centralizá-lo no retângulo
+    int altura_fonte = 20;
+    tamanho_t dimensoes_texto = tela_texto_dimensoes(altura_fonte, texto);
+    ponto_t pos_texto = {
+        botao.posicao.x + (botao.tamanho.largura - dimensoes_texto.largura) / 2,
+        botao.posicao.y + (botao.tamanho.altura - altura_fonte) / 2 + altura_fonte / 2
+    };
 
-    botao_t botao_iniciar = {posicao_iniciar, {300, 60}};
-    botao_t botao_recordes = {posicao_recordes, {300, 60}};
-    botao_t botao_sair = {posicao_sair, {300, 60}};
-
-    while (1) {
-        tela_atualiza();
-
-        tela_texto(posicao_titulo, 36, cor_texto, "Lucas Sudoku Game");
-
-        desenhar_botao(botao_iniciar, cor_botao_fundo, cor_botao_borda, cor_texto, "Iniciar Jogo");
-        desenhar_botao(botao_recordes, cor_botao_fundo, cor_botao_borda, cor_texto, "Recordes");
-        desenhar_botao(botao_sair, cor_botao_fundo, cor_botao_borda, cor_texto, "Sair");
-
-        // Verificar cliques do mouse
-        rato_t rato = tela_rato();
-        desenhar_cursor_mouse(rato);
-
-        if (rato.clicado[0]) {  // Clique do botão esquerdo do mouse
-            if (rato.posicao.x >= botao_iniciar.posicao.x &&
-                rato.posicao.x <= botao_iniciar.posicao.x + botao_iniciar.tamanho.largura &&
-                rato.posicao.y >= botao_iniciar.posicao.y &&
-                rato.posicao.y <= botao_iniciar.posicao.y + botao_iniciar.tamanho.altura) {
-                printf("Iniciar Jogo\n");
-                break;
-            } else if (rato.posicao.x >= botao_recordes.posicao.x &&
-                       rato.posicao.x <= botao_recordes.posicao.x + botao_recordes.tamanho.largura &&
-                       rato.posicao.y >= botao_recordes.posicao.y &&
-                       rato.posicao.y <= botao_recordes.posicao.y + botao_recordes.tamanho.altura) {
-                printf("Recordes\n");
-                break;
-            } else if (rato.posicao.x >= botao_sair.posicao.x &&
-                       rato.posicao.x <= botao_sair.posicao.x + botao_sair.tamanho.largura &&
-                       rato.posicao.y >= botao_sair.posicao.y &&
-                       rato.posicao.y <= botao_sair.posicao.y + botao_sair.tamanho.altura) {
-                printf("Sair\n");
-                tela_fim();
-                return;
-            }
-        }
-
-        // Verificar entrada do teclado
-        char tecla = tela_tecla();
-        if (tecla != '\0') {
-            if (tecla == '1') {
-                printf("Iniciar Jogo\n");
-                break;
-            } else if (tecla == '2') {
-                printf("Recordes\n");
-                break;
-            } else if (tecla == '3') {
-                printf("Sair\n");
-                tela_fim();
-                return;
-            }
-        }
-    }
-
-    // Finalizar a tela (pode ser recolocada dependendo do fluxo do jogo)
-    tela_fim();
+    // Desenha o texto centralizado no botão
+    tela_texto(pos_texto, altura_fonte, cor_texto, (char*)texto);
 }
-
 
 // Funções de leitura de arquivo e inicialização
 tabuleiro_t* ler_tabuleiros(const char* arquivo, int* num_tabuleiros) {
@@ -165,6 +104,73 @@ tabuleiro_t* ler_tabuleiros(const char* arquivo, int* num_tabuleiros) {
     return tabuleiros;
 }
 
+// Funções para processar entradas do usuário
+void processa_entrada_mouse(jogo_t* jogo) {
+    rato_t rato = tela_rato();
+    desenhar_cursor_mouse(rato);
+
+    // Determina a casa do tabuleiro sob o mouse
+    int x = rato.posicao.x / 50; // Tamanho da casa é 50 pixels
+    int y = rato.posicao.y / 50;
+
+    // Verifica se a posição está dentro dos limites do tabuleiro
+    if (x >= 0 && x < 9 && y >= 0 && y < 9) {
+        jogo->cursor_x = x;
+        jogo->cursor_y = y;
+
+        // Verifica qual botão foi clicado
+        if (rato.clicado[0]) { // Botão esquerdo do mouse
+            casa_t* casa = &jogo->casas[x][y];
+            if (!casa->inicial) {
+                casa->valor = jogo->valor_jogada; // Define o valor da casa
+            }
+        } else if (rato.clicado[1]) { // Botão direito do mouse
+            casa_t* casa = &jogo->casas[y][x];
+            if (casa->valor == 0) {
+                  int num_marca = jogo->valor_jogada - 1; // Converte valor de jogada para índice de marcação (0 a 8)
+                casa->marca[num_marca] = !casa->marca[num_marca]; // Alterna a marcação
+    
+                // Verifica se a marcação é válida (apenas uma marcação por vez)
+                if (casa->marca[num_marca]) {
+       
+                    for (int i = 0; i < 9; i++) {
+                        // Desmarca outras casas na mesma linha
+                        if (i != x) jogo->casas[x][i].marca[num_marca] = false;
+                        if (i != y) jogo->casas[i][y].marca[num_marca] = false;
+                    }
+
+                int bloco_x = x / 3;
+                int bloco_y = y / 3;
+                for (int i = bloco_y * 3; i < bloco_y * 3 + 3; i++) {
+                    for (int j = bloco_x * 3; j < bloco_x * 3 + 3; j++) {
+                        if (i != y && j != x) jogo->casas[i][j].marca[num_marca] = false;
+                    }       
+                }
+
+                }
+            }
+        }
+    } else {
+        jogo->cursor_x = -1;
+        jogo->cursor_y = -1;
+    }
+
+     if (rato.posicao.x >= 500 && rato.posicao.y >= 450 && rato.clicado[0]) {
+        printf("Jogo encerrado pelo jogador.");
+        exit(0);
+    }
+}
+
+void processa_entrada_teclado(jogo_t* jogo) {
+    int tecla = tela_tecla();
+    if (tecla >= '1' && tecla <= '9') {
+        jogo->valor_jogada = tecla - '0';
+    } else if (tecla == '0' || tecla == ' ') {
+        jogo->valor_jogada = 0;
+    }
+}
+
+
 void inicializa_jogo(jogo_t* jogo, tabuleiro_t* tabuleiros, int num_tabuleiros) {
     srand(time(NULL));
     int indice = rand() % num_tabuleiros;
@@ -180,12 +186,11 @@ void inicializa_jogo(jogo_t* jogo, tabuleiro_t* tabuleiros, int num_tabuleiros) 
             jogo->casas[i][j].valor = tabuleiro_selecionado.tabuleiro[i][j];
             jogo->casas[i][j].inicial = (jogo->casas[i][j].valor != 0);
             for (int k = 0; k < 9; k++) {
-                jogo->casas[i][j].marcacoes[k] = false;
+                jogo->casas[i][j].marca[k] = false;
             }
         }
     }
 }
-
 // Função para desenhar o tabuleiro na tela
 void desenha_casa(int x, int y, casa_t casa, bool cursor) {
     int tamanho_casa = 50;
@@ -208,7 +213,7 @@ void desenha_casa(int x, int y, casa_t casa, bool cursor) {
         tela_texto(pos_texto, 20, cor_texto, texto);
     } else {
         for (int i = 0; i < 9; i++) {
-            if (casa.marcacoes[i]) {
+            if (casa.marca[i]) {
                 ponto_t pos_marcacao = {inicio.x + (i % 3) * 15, inicio.y + (i / 3) * 15};
                 tela_texto(pos_marcacao, 10, cor_linha, "*");
             }
@@ -217,6 +222,7 @@ void desenha_casa(int x, int y, casa_t casa, bool cursor) {
 }
 
 void desenha_tabuleiro(jogo_t jogo) {
+    // Desenha as casas do tabuleiro
     for (int i = 0; i < 9; i++) {
         for (int j = 0; j < 9; j++) {
             bool cursor = (i == jogo.cursor_x && j == jogo.cursor_y);
@@ -226,64 +232,25 @@ void desenha_tabuleiro(jogo_t jogo) {
 
     // Desenha a área de desistência
     ponto_t pos_desistencia = {500, 450};
+    tamanho_t tamanho_desistencia = {90, 40};
+    cor_t cor_fundo_desistencia = {0.2, 0.2, 0.2, 1.0};
+    cor_t cor_borda_desistencia = {0, 1, 0, 1};
     cor_t cor_texto = {0, 1, 0, 1};
-    tela_texto(pos_desistencia, 20, cor_texto, "Desistir");
-}
 
+    // Desenha retângulo de fundo
+    retangulo_t retangulo_desistencia = {pos_desistencia, tamanho_desistencia};
+    tela_retangulo(retangulo_desistencia, 2, cor_borda_desistencia, cor_fundo_desistencia);
 
-// Funções para processar entradas do usuário
-void processa_entrada_mouse(jogo_t* jogo) {
-    rato_t rato = tela_rato();
-    desenhar_cursor_mouse(rato);
+    // Calcula a posição do texto para centralizá-lo no retângulo
+    int altura_fonte = 20;
+    ponto_t pos_texto = {
+        pos_desistencia.x + (tamanho_desistencia.largura - tela_texto_dimensoes(altura_fonte, "Desistir").largura) / 2,
+        pos_desistencia.y + (tamanho_desistencia.altura - altura_fonte) / 2 + altura_fonte / 2
+    };
+    
+    // Desenha o texto "Desistir" centralizado no botão
+    tela_texto(pos_texto, altura_fonte, cor_texto, "Desistir");
 
-    // Determina a casa do tabuleiro sob o mouse
-    int x = rato.posicao.x / 50;
-    int y = rato.posicao.y / 50;
-
-    if (x >= 0 && x < 9 && y >= 0 && y < 9) {
-        jogo->cursor_x = x;
-        jogo->cursor_y = y;
-
-        if (rato.clicado[0]) { // Clique com o botão esquerdo
-            casa_t* casa = &jogo->casas[y][x];
-            if (!casa->inicial) {
-                if (jogo->valor_jogada == 0) {
-                    casa->valor = 0;
-                } else {
-                    casa->valor = jogo->valor_jogada;
-                }
-            }
-        } else if (rato.clicado[1]) { // Clique com o botão direito
-            casa_t* casa = &jogo->casas[y][x];
-            if (casa->valor == 0) {
-                if (jogo->valor_jogada == 0) {
-                    for (int i = 0; i < 9; i++) {
-                        casa->marcacoes[i] = false;
-                    }
-                } else {
-                    casa->marcacoes[jogo->valor_jogada - 1] = !casa->marcacoes[jogo->valor_jogada - 1];
-                }
-            }
-        }
-    } else {
-        jogo->cursor_x = -1;
-        jogo->cursor_y = -1;
-    }
-
-    if (rato.posicao.x >= 500 && rato.posicao.y >= 450 && rato.clicado[0]) {
-        printf("Jogo encerrado pelo jogador.");
-        exit(0);
-        
-    }
-}
-
-void processa_entrada_teclado(jogo_t* jogo) {
-    int tecla = tela_tecla();
-    if (tecla >= '1' && tecla <= '9') {
-        jogo->valor_jogada = tecla - '0';
-    } else if (tecla == '0' || tecla == ' ') {
-        jogo->valor_jogada = 0;
-    }
 }
 
 // Funções de verificação do término do jogo
@@ -403,33 +370,126 @@ int comparar_pontuacoes(const void* a, const void* b) {
     return pb->pontuacao - pa->pontuacao;
 }
 
-int main() {
-    exibir_menu_inicial();
-    tamanho_t tamanho_tela = {600, 500};
-    tela_inicio(tamanho_tela, "Sudoku");
+void exibir_menu_inicial() {
+    tamanho_t tamanho_tela = {LARGURA_TELA, ALTURA_TELA};
+    tela_inicio(tamanho_tela, "Lucas Sudoku Game");
 
-    int num_tabuleiros;
-    tabuleiro_t* tabuleiros = ler_tabuleiros("tabuleiros.txt", &num_tabuleiros);
+    cor_t cor_fundo = {0, 0, 0, 1};
+    cor_t cor_texto = {0, 1, 0, 1};
+    cor_t cor_botao_fundo = {0.2, 0.2, 0.2, 1};
+    cor_t cor_botao_borda = {0, 1, 0, 1};
 
-    jogo_t jogo;
-    inicializa_jogo(&jogo, tabuleiros, num_tabuleiros);
+    // Centraliza o título
+    int altura_fonte_titulo = 20;
+    tamanho_t tamanho_titulo = tela_texto_dimensoes(altura_fonte_titulo, "LUCAS SUDOKU GAME :)");
+    ponto_t posicao_titulo = {
+        (LARGURA_TELA - tamanho_titulo.largura) / 2,
+        ALTURA_TELA / 5
+    };
 
-    while (true) {
-        processa_entrada_mouse(&jogo);
-        processa_entrada_teclado(&jogo);
-        desenha_tabuleiro(jogo);
+    // Centraliza os botões
+    int largura_botao = 300;
+    int altura_botao = 60;
+    ponto_t posicao_jogar = {LARGURA_TELA / 2 - largura_botao / 2, ALTURA_TELA / 2 - 90};
+    ponto_t posicao_recordes = {LARGURA_TELA / 2 - largura_botao / 2, ALTURA_TELA / 2 - 30};
+    ponto_t posicao_help = {LARGURA_TELA / 2 - largura_botao / 2, ALTURA_TELA / 2 + 30};
+    ponto_t posicao_sair = {LARGURA_TELA / 2 - largura_botao / 2, ALTURA_TELA / 2 + 90};
 
+    botao_t botao_jogar = {posicao_jogar, {largura_botao, altura_botao}};
+    botao_t botao_recordes = {posicao_recordes, {largura_botao, altura_botao}};
+    botao_t botao_help = {posicao_help, {largura_botao, altura_botao}};
+    botao_t botao_sair = {posicao_sair, {largura_botao, altura_botao}};
+
+    while (1) {
         tela_atualiza();
 
-        if (verifica_preenchimento_completo(jogo) && verifica_regras_sudoku(jogo)) {
-            finalizar_jogo(&jogo);
-            break;
+        tela_texto(posicao_titulo, altura_fonte_titulo, cor_texto, (char*)"LUCAS SUDOKU GAME");
+
+        desenhar_botao_centralizado(botao_jogar, cor_botao_fundo, cor_botao_borda, cor_texto, "Jogar");
+        desenhar_botao_centralizado(botao_recordes, cor_botao_fundo, cor_botao_borda, cor_texto, "Recordes");
+        desenhar_botao_centralizado(botao_help, cor_botao_fundo, cor_botao_borda, cor_texto, "Help");
+        desenhar_botao_centralizado(botao_sair, cor_botao_fundo, cor_botao_borda, cor_texto, "Sair");
+
+        // Verificar cliques do mouse
+        rato_t rato = tela_rato();
+        desenhar_cursor_mouse(rato);
+
+        if (rato.clicado[0]) {  // Clique do botão esquerdo do mouse
+            if (rato.posicao.x >= botao_jogar.posicao.x &&
+                rato.posicao.x <= botao_jogar.posicao.x + botao_jogar.tamanho.largura &&
+                rato.posicao.y >= botao_jogar.posicao.y &&
+                rato.posicao.y <= botao_jogar.posicao.y + botao_jogar.tamanho.altura) {
+                printf("Jogar\n");
+                tamanho_t tamanho_tela = {600, 500};
+                tela_inicio(tamanho_tela, "Sudoku do Luketa");
+                int num_tabuleiros;
+                tabuleiro_t* tabuleiros = ler_tabuleiros("tabuleiros.txt", &num_tabuleiros);
+
+                jogo_t jogo;
+                inicializa_jogo(&jogo, tabuleiros, num_tabuleiros);
+
+                while (true) {
+                    processa_entrada_mouse(&jogo);
+                    processa_entrada_teclado(&jogo);
+                    desenha_tabuleiro(jogo);
+
+                    tela_atualiza();
+
+                    if (verifica_preenchimento_completo(jogo) && verifica_regras_sudoku(jogo)) {
+                        finalizar_jogo(&jogo);
+                        break;
+                    }
+                }
+
+                tela_fim();
+                free(tabuleiros);
+            } else if (rato.posicao.x >= botao_recordes.posicao.x &&
+                       rato.posicao.x <= botao_recordes.posicao.x + botao_recordes.tamanho.largura &&
+                       rato.posicao.y >= botao_recordes.posicao.y &&
+                       rato.posicao.y <= botao_recordes.posicao.y + botao_recordes.tamanho.altura) {
+                printf("Recordes\n");
+                break;
+            } else if (rato.posicao.x >= botao_help.posicao.x &&
+                       rato.posicao.x <= botao_help.posicao.x + botao_help.tamanho.largura &&
+                       rato.posicao.y >= botao_help.posicao.y &&
+                       rato.posicao.y <= botao_help.posicao.y + botao_help.tamanho.altura) {
+                printf("Help\n");
+                break;
+            } else if (rato.posicao.x >= botao_sair.posicao.x &&
+                       rato.posicao.x <= botao_sair.posicao.x + botao_sair.tamanho.largura &&
+                       rato.posicao.y >= botao_sair.posicao.y &&
+                       rato.posicao.y <= botao_sair.posicao.y + botao_sair.tamanho.altura) {
+                printf("Sair\n");
+                tela_fim();
+                return;
+            }
+        }
+
+        // Verificar entrada do teclado
+        char tecla = tela_tecla();
+        if (tecla != '\0') {
+            if (tecla == '1') {
+                printf("Jogar\n");
+                break;
+            } else if (tecla == '2') {
+                printf("Recordes\n");
+                break;
+            } else if (tecla == '3') {
+                printf("Help\n");
+                break;
+            } else if (tecla == '4') {
+                printf("Sair\n");
+                tela_fim();
+                return;
+            }
         }
     }
 
+    // Finalizar a tela (pode ser recolocada dependendo do fluxo do jogo)
     tela_fim();
-    free(tabuleiros);
+}
 
-    return 0;
-
+// Função principal do jogo
+int main() {
+    exibir_menu_inicial();
 }
