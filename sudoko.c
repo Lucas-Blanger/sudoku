@@ -24,6 +24,7 @@ typedef struct {
     char jogador[20];
     int tabuleiro_id;
     int pontuacao;
+    time_t data_hora;
 } pontuacao_t;
 
 typedef struct {
@@ -47,9 +48,12 @@ pontuacao_t* ler_pontuacoes(const char* arquivo, int* num_pontuacoes);
 void escrever_pontuacoes(const char* arquivo, pontuacao_t* pontuacoes, int num_pontuacoes);
 int comparar_pontuacoes(const void* a, const void* b);
 tamanho_t tela_texto_dimensoes(int altura_fonte, const char* texto);
+void exibir_opcoes_finais();
+void finalizar_jogo(jogo_t* jogo);
+void exibir_menu_inicial();
 
 void desenhar_cursor_mouse(rato_t rato) {
-    cor_t cor_cursor = {1, 0, 0, 1};
+    cor_t cor_cursor = {0, 1, 0, 1};
     ponto_t posicao = {rato.posicao.x, rato.posicao.y};
     circulo_t cursor = {posicao, 5};
     tela_circulo(cursor, 1, cor_cursor, cor_cursor);
@@ -185,10 +189,18 @@ void inicializa_jogo(jogo_t* jogo, tabuleiro_t* tabuleiros, int num_tabuleiros) 
         for (int j = 0; j < 9; j++) {
             jogo->casas[i][j].valor = tabuleiro_selecionado.tabuleiro[i][j];
             jogo->casas[i][j].inicial = (jogo->casas[i][j].valor != 0);
-            for (int k = 0; k < 9; k++) {
-                jogo->casas[i][j].marca[k] = false;
+             for (int k = 0; k < 9; k++) {
+                jogo->casas[i][j].marca[k] = 0;
             }
         }
+    }
+
+     // Solicita a identificação do jogador
+    printf("Identificação do jogador: ");
+    fgets(jogo->jogador, 20, stdin);
+    jogo->jogador[strcspn(jogo->jogador, "\n")] = '\0'; // Remove o newline
+    if (jogo->jogador[0] == '\0') {
+        strcpy(jogo->jogador, "Jogador");
     }
 }
 // Função para desenhar o tabuleiro na tela
@@ -308,6 +320,71 @@ bool verifica_regras_sudoku(jogo_t jogo) {
     return true;
 }
 
+pontuacao_t* ler_pontuacoes(const char* arquivo, int* num_pontuacoes) {
+    FILE* f = fopen(arquivo, "r");
+    if (!f) {
+        *num_pontuacoes = 0;
+        return malloc(0);
+    }
+
+    fscanf(f, "%d", num_pontuacoes);
+    pontuacao_t* pontuacoes = malloc(*num_pontuacoes * sizeof(pontuacao_t));
+
+    for (int i = 0; i < *num_pontuacoes; i++) {
+        fscanf(f, "%s %d %d %ld", pontuacoes[i].jogador, &pontuacoes[i].tabuleiro_id, &pontuacoes[i].pontuacao, &pontuacoes[i].data_hora);
+    }
+
+    fclose(f);
+    return pontuacoes;
+}
+
+void escrever_pontuacoes(const char* arquivo, pontuacao_t* pontuacoes, int num_pontuacoes) {
+    FILE* f = fopen(arquivo, "w");
+    if (!f) {
+        perror("Erro ao abrir arquivo de pontuações para escrita");
+        exit(1);
+    }
+
+    fprintf(f, "%d\n", num_pontuacoes);
+    for (int i = 0; i < num_pontuacoes; i++) {
+        fprintf(f, "%s %d %d %ld\n", pontuacoes[i].jogador, pontuacoes[i].tabuleiro_id, pontuacoes[i].pontuacao, pontuacoes[i].data_hora);
+    }
+
+    fclose(f);
+}
+
+int comparar_pontuacoes(const void* a, const void* b) {
+    pontuacao_t* pa = (pontuacao_t*)a;
+    pontuacao_t* pb = (pontuacao_t*)b;
+
+    // Primeiro comparação por pontuação decrescente
+    if (pb->pontuacao != pa->pontuacao) {
+        return pb->pontuacao - pa->pontuacao;
+    } else {
+        // Se pontuações forem iguais, compara por data e hora (mais recente primeiro)
+        return pb->data_hora - pa->data_hora;
+    }
+}
+
+int obter_colocacao(const char* nome_jogador, int pontuacao_jogador) {
+    int colocacao = 1;
+
+    int num_pontuacoes;
+    pontuacao_t* pontuacoes = ler_pontuacoes("pontuacoes.txt", &num_pontuacoes);
+
+    for (int i = 0; i < num_pontuacoes; ++i) {
+        if (pontuacao_jogador > pontuacoes[i].pontuacao) {
+            colocacao++;
+        }
+    }
+
+    free(pontuacoes);
+
+    return colocacao;
+}
+
+
+
 void finalizar_jogo(jogo_t* jogo) {
     time_t fim_tempo = time(NULL);
     int tempo_total = difftime(fim_tempo, jogo->inicio_tempo);
@@ -328,46 +405,74 @@ void finalizar_jogo(jogo_t* jogo) {
     escrever_pontuacoes("pontuacoes.txt", pontuacoes, num_pontuacoes + 1);
 
     free(pontuacoes);
+
+    // Exibe opções finais
+    exibir_opcoes_finais(jogo->jogador, pontuacao);
 }
 
-// Funções para manipular arquivo de pontuações
-pontuacao_t* ler_pontuacoes(const char* arquivo, int* num_pontuacoes) {
-    FILE* f = fopen(arquivo, "r");
-    if (!f) {
-        *num_pontuacoes = 0;
-        return malloc(0);
+void exibir_opcoes_finais(const char* nome_jogador, int pontuacao_jogador) {
+    tamanho_t tamanho_tela = {800, 600}; // Ajuste as dimensões da tela conforme necessário
+    tela_inicio(tamanho_tela, "Lucas Sudoku Game");
+
+    cor_t cor_fundo = {0, 0, 0, 1};
+    cor_t cor_texto = {0, 1, 0, 1};
+    cor_t cor_botao_fundo = {0.2, 0.2, 0.2, 1};
+    cor_t cor_botao_borda = {0, 1, 0, 1};
+
+    // Define as posições e tamanhos dos botões
+    botao_t botao_jogar_novamente = {
+        .posicao = { tamanho_tela.largura / 2 - 100, tamanho_tela.altura / 2 + 50 },
+        .tamanho = { 200, 50 }
+    };
+    botao_t botao_encerrar = {
+        .posicao = { tamanho_tela.largura / 2 - 100, tamanho_tela.altura / 2 + 120 },
+        .tamanho = { 200, 50 }
+    };
+
+    // Obtém a colocação do jogador
+    int colocacao = obter_colocacao(nome_jogador, pontuacao_jogador);
+
+
+    while (1) {
+        tela_atualiza();
+        desenhar_botao_centralizado(botao_jogar_novamente, cor_botao_fundo, cor_botao_borda, cor_texto, "Jogar Novamente");
+        desenhar_botao_centralizado(botao_encerrar, cor_botao_fundo, cor_botao_borda, cor_texto, "Encerrar");
+
+        // Exibe a pontuação e colocação do jogador
+        char texto_pontuacao[100];
+        sprintf(texto_pontuacao, "Parabéns, %s! Sua pontuação: %d\nSua colocação: %d", nome_jogador, pontuacao_jogador, colocacao);
+
+        // Calcula a posição para desenhar o texto centralizado
+        tamanho_t dimensoes_texto = tela_texto_dimensoes(24, texto_pontuacao);
+        int pos_x_texto = (tamanho_tela.largura - dimensoes_texto.largura) / 2;
+        int pos_y_texto = (tamanho_tela.altura / 2) - 50;
+
+        int altura_fonte_texto = 20;
+        tamanho_t tamanho_texto = tela_texto_dimensoes(altura_fonte_texto, texto_pontuacao);
+        ponto_t posicao_texto = {
+            (LARGURA_TELA - tamanho_texto.largura) / 2,
+            ALTURA_TELA / 5
+        };
+
+        tela_texto(posicao_texto, altura_fonte_texto, cor_texto, (char*) texto_pontuacao);
+
+        rato_t rato = tela_rato();
+        desenhar_cursor_mouse(rato);
+        if (rato.clicado[0]) { 
+          if (rato.posicao.x >= botao_jogar_novamente.posicao.x &&
+              rato.posicao.x <= botao_jogar_novamente.posicao.x + botao_jogar_novamente.tamanho.largura &&
+              rato.posicao.y >= botao_jogar_novamente.posicao.y &&
+              rato.posicao.y <= botao_jogar_novamente.posicao.y + botao_jogar_novamente.tamanho.altura) {
+              printf("Jogar Novamente\n");
+              exibir_menu_inicial();
+          } else if (rato.posicao.x >= botao_encerrar.posicao.x &&
+                    rato.posicao.x <= botao_encerrar.posicao.x + botao_encerrar.tamanho.largura &&
+                    rato.posicao.y >= botao_encerrar.posicao.y &&
+                    rato.posicao.y <= botao_encerrar.posicao.y + botao_encerrar.tamanho.altura) {
+              exit(0); // Encerra o programa
+          }
+        }
     }
-
-    fscanf(f, "%d", num_pontuacoes);
-    pontuacao_t* pontuacoes = malloc(*num_pontuacoes * sizeof(pontuacao_t));
-
-    for (int i = 0; i < *num_pontuacoes; i++) {
-        fscanf(f, "%s %d %d", pontuacoes[i].jogador, &pontuacoes[i].tabuleiro_id, &pontuacoes[i].pontuacao);
-    }
-
-    fclose(f);
-    return pontuacoes;
-}
-
-void escrever_pontuacoes(const char* arquivo, pontuacao_t* pontuacoes, int num_pontuacoes) {
-    FILE* f = fopen(arquivo, "w");
-    if (!f) {
-        perror("Erro ao abrir arquivo de pontuações para escrita");
-        exit(1);
-    }
-
-    fprintf(f, "%d\n", num_pontuacoes);
-    for (int i = 0; i < num_pontuacoes; i++) {
-        fprintf(f, "%s %d %d\n", pontuacoes[i].jogador, pontuacoes[i].tabuleiro_id, pontuacoes[i].pontuacao);
-    }
-
-    fclose(f);
-}
-
-int comparar_pontuacoes(const void* a, const void* b) {
-    pontuacao_t* pa = (pontuacao_t*)a;
-    pontuacao_t* pb = (pontuacao_t*)b;
-    return pb->pontuacao - pa->pontuacao;
 }
 
 void exibir_menu_inicial() {
@@ -390,13 +495,11 @@ void exibir_menu_inicial() {
     // Centraliza os botões
     int largura_botao = 300;
     int altura_botao = 60;
-    ponto_t posicao_jogar = {LARGURA_TELA / 2 - largura_botao / 2, ALTURA_TELA / 2 - 90};
-    ponto_t posicao_recordes = {LARGURA_TELA / 2 - largura_botao / 2, ALTURA_TELA / 2 - 30};
-    ponto_t posicao_help = {LARGURA_TELA / 2 - largura_botao / 2, ALTURA_TELA / 2 + 30};
-    ponto_t posicao_sair = {LARGURA_TELA / 2 - largura_botao / 2, ALTURA_TELA / 2 + 90};
+    ponto_t posicao_jogar = {LARGURA_TELA / 2 - largura_botao / 2, ALTURA_TELA / 2 - altura_botao - 30};
+    ponto_t posicao_help = {LARGURA_TELA / 2 - largura_botao / 2, ALTURA_TELA / 2};
+    ponto_t posicao_sair = {LARGURA_TELA / 2 - largura_botao / 2, ALTURA_TELA / 2 + altura_botao + 30};
 
     botao_t botao_jogar = {posicao_jogar, {largura_botao, altura_botao}};
-    botao_t botao_recordes = {posicao_recordes, {largura_botao, altura_botao}};
     botao_t botao_help = {posicao_help, {largura_botao, altura_botao}};
     botao_t botao_sair = {posicao_sair, {largura_botao, altura_botao}};
 
@@ -406,7 +509,6 @@ void exibir_menu_inicial() {
         tela_texto(posicao_titulo, altura_fonte_titulo, cor_texto, (char*)"LUCAS SUDOKU GAME");
 
         desenhar_botao_centralizado(botao_jogar, cor_botao_fundo, cor_botao_borda, cor_texto, "Jogar");
-        desenhar_botao_centralizado(botao_recordes, cor_botao_fundo, cor_botao_borda, cor_texto, "Recordes");
         desenhar_botao_centralizado(botao_help, cor_botao_fundo, cor_botao_borda, cor_texto, "Help");
         desenhar_botao_centralizado(botao_sair, cor_botao_fundo, cor_botao_borda, cor_texto, "Sair");
 
@@ -414,7 +516,7 @@ void exibir_menu_inicial() {
         rato_t rato = tela_rato();
         desenhar_cursor_mouse(rato);
 
-        if (rato.clicado[0]) {  // Clique do botão esquerdo do mouse
+        if (rato.clicado[0]) { 
             if (rato.posicao.x >= botao_jogar.posicao.x &&
                 rato.posicao.x <= botao_jogar.posicao.x + botao_jogar.tamanho.largura &&
                 rato.posicao.y >= botao_jogar.posicao.y &&
@@ -443,12 +545,6 @@ void exibir_menu_inicial() {
 
                 tela_fim();
                 free(tabuleiros);
-            } else if (rato.posicao.x >= botao_recordes.posicao.x &&
-                       rato.posicao.x <= botao_recordes.posicao.x + botao_recordes.tamanho.largura &&
-                       rato.posicao.y >= botao_recordes.posicao.y &&
-                       rato.posicao.y <= botao_recordes.posicao.y + botao_recordes.tamanho.altura) {
-                printf("Recordes\n");
-                break;
             } else if (rato.posicao.x >= botao_help.posicao.x &&
                        rato.posicao.x <= botao_help.posicao.x + botao_help.tamanho.largura &&
                        rato.posicao.y >= botao_help.posicao.y &&
@@ -470,9 +566,6 @@ void exibir_menu_inicial() {
         if (tecla != '\0') {
             if (tecla == '1') {
                 printf("Jogar\n");
-                break;
-            } else if (tecla == '2') {
-                printf("Recordes\n");
                 break;
             } else if (tecla == '3') {
                 printf("Help\n");
