@@ -5,6 +5,11 @@
 #include "telag2.h"
 #include <time.h>
 
+/*Trabalho 3 - Sudoku
+Laboratório de Programacao I
+Lucas Blanger
+*/
+
 #define LARGURA_TELA 600
 #define ALTURA_TELA 500
 
@@ -136,7 +141,6 @@ void processa_entrada_mouse(jogo_t* jogo) {
                         if (i != y) jogo->casas[x][i].marca[num_marca] = false;
                         if (i != x) jogo->casas[i][y].marca[num_marca] = false;
                     }
-
                     // Desmarca outras casas no mesmo bloco 3x3
                     int bloco_x = x / 3;
                     int bloco_y = y / 3;
@@ -152,7 +156,6 @@ void processa_entrada_mouse(jogo_t* jogo) {
         jogo->cursor_x = -1;
         jogo->cursor_y = -1;
     }
-
      if (rato.posicao.x >= 500 && rato.posicao.y >= 450 && rato.clicado[0]) {
         printf("Jogo encerrado pelo jogador.");
         exit(0);
@@ -327,10 +330,6 @@ pontuacao_t* ler_pontuacoes(const char* arquivo, int* num_pontuacoes) {
 
 void escrever_pontuacoes(const char* arquivo, pontuacao_t* pontuacoes, int num_pontuacoes) {
     FILE* f = fopen(arquivo, "w");
-    if (!f) {
-        perror("Erro ao abrir arquivo de pontuações para escrita");
-        exit(1);
-    }
 
     fprintf(f, "%d\n", num_pontuacoes);
     for (int i = 0; i < num_pontuacoes; i++) {
